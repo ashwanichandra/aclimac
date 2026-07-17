@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Aclimac Linux Desktop</title>
+<style>
+  :root{
+    --menubar-h: 26px;
+    --dock-h: 64px;
+    --glass: rgba(255,255,255,0.55);
+    --glass-dark: rgba(30,30,32,0.6);
+    --accent: #0A84FF;
+    --text-dark: #1d1d1f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    width:100%; height:100%; overflow:hidden;
+    font-family:-apple-system, "SF Pro Display", "Segoe UI", Helvetica, Arial, sans-serif;
+    user-select:none;
+  }
+  body{
+    background:
+      radial-gradient(ellipse at 30% 20%, rgba(255,255,255,0.08), transparent 60%),
+      linear-gradient(160deg, #3a6b8a 0%, #5a8fae 30%, #d98f7a 65%, #e8b184 100%);
+    position:relative;
+    height:100vh;
+  }
+
+  /* ---------- Menu Bar ---------- */
+  #menubar{
+    position:fixed; top:0; left:0; right:0; height:var(--menubar-h);
+    background:rgba(255,255,255,0.35);
+    backdrop-filter:blur(30px) saturate(180%);
+    -webkit-backdrop-filter:blur(30px) saturate(180%);
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 14px;
+    font-size:13px; font-weight:500;
+    color:var(--text-dark);
+    z-index:9000;
+    box-shadow:0 1px 0 rgba(0,0,0,0.06);
+  }
+  #menubar .left, #menubar .right{ display:flex; align-items:center; gap:16px; height:100%; }
+  #menubar .left span{ cursor:default; }
+  #menubar .apple-logo{ font-size:15px; margin-right:2px; }
+  #menubar .app-name{ font-weight:700; }
+  #menubar .right span{ font-size:12.5px; display:flex; align-items:center; }
+  #menubar .icon{ font-size:13px; opacity:0.85; }
+
+  /* ---------- Desktop Icons ---------- */
+  #desktop-icons{
+    position:fixed; top:calc(var(--menubar-h) + 16px); right:18px;
+    display:flex; flex-direction:column; gap:18px; z-index:10;
+  }
+  .dicon{
+    width:78px; display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:6px; border-radius:8px; cursor:default;
+  }
+  .dicon:hover, .dicon.selected{ background:rgba(255,255,255,0.18); }
+  .dicon .glyph{ font-size:34px; filter:drop-shadow(0 2px 3px rgba(0,0,0,0.3)); }
+  .dicon .label{
+    font-size:11.5px; color:white; text-align:center;
+    text-shadow:0 1px 2px rgba(0,0,0,0.6);
+    background:transparent; padding:1px 4px; border-radius:3px;
+    line-height:1.2;
+  }
+
+  /* ---------- Windows ---------- */
+  .window{
+    position:absolute;
+    min-width:320px; min-height:200px;
+    background:var(--glass);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border-radius:10px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.35), 0 0 0 0.5px rgba(255,255,255,0.4) inset;
+    overflow:hidden;
+    display:flex; flex-direction:column;
+    z-index:100;
+    transition:box-shadow .15s ease;
+  }
+  .window.inactive .titlebar{ background:rgba(255,255,255,0.25); }
+  .window.inactive .traffic{ opacity:0.45; }
+  .titlebar{
+    height:38px; flex:0 0 38px;
+    background:rgba(255,255,255,0.45);
+    display:flex; align-items:center; padding:0 12px;
+    cursor:grab; position:relative;
+    border-bottom:1px solid rgba(0,0,0,0.06);
+  }
+  .titlebar:active{ cursor:grabbing; }
+  .traffic{ display:flex; gap:8px; }
+  .traffic span{
+    width:12px; height:12px; border-radius:50%;
+    display:inline-block; position:relative;
+    box-shadow:0 0 0 0.5px rgba(0,0,0,0.15) inset;
+  }
+  .traffic .close{ background:#ff5f57; }
+  .traffic .min{ background:#febc2e; }
+  .traffic .zoom{ background:#28c840; }
+  .traffic span::after{
+    content:''; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  }
+  .titlebar .wtitle{
+    position:absolute; left:0; right:0; text-align:center;
+    font-size:13px; font-weight:600; color:var(--text-dark); pointer-events:none;
+  }
+  .wbody{
+    flex:1; overflow:auto; background:rgba(255,255,255,0.65);
+    color:var(--text-dark); font-size:13px;
+  }
+  .resize-handle{
+    position:absolute; width:16px; height:16px; right:0; bottom:0; cursor:nwse-resize;
+  }
+
+  /* ---------- Finder window content ---------- */
+  .finder-layout{ display:flex; height:100%; }
+  .sidebar{
+    width:170px; flex:0 0 170px; background:rgba(240,240,242,0.7);
+    padding:10px 8px; border-right:1px solid rgba(0,0,0,0.07);
+    font-size:12.5px;
+  }
+  .sidebar .heading{ color:#6e6e73; font-size:11px; margin:10px 4px 4px; text-transform:uppercase; letter-spacing:.03em;}
+  .sidebar .item{ padding:5px 8px; border-radius:5px; display:flex; align-items:center; gap:7px; cursor:default; }
+  .sidebar .item:hover{ background:rgba(0,0,0,0.05); }
+  .sidebar .item.active{ background:var(--accent); color:white; }
+  .finder-main{ flex:1; padding:16px; overflow:auto; }
+  .grid-icons{ display:grid; grid-template-columns:repeat(auto-fill,minmax(84px,1fr)); gap:16px; }
+  .grid-icons .fi{ display:flex; flex-direction:column; align-items:center; gap:4px; padding:8px 4px; border-radius:6px; }
+  .grid-icons .fi:hover{ background:rgba(10,132,255,0.12); }
+  .grid-icons .fi .g{ font-size:32px; }
+  .grid-icons .fi .l{ font-size:11.5px; text-align:center; }
+
+  /* ---------- Terminal content ---------- */
+  .terminal{
+    background:rgba(28,28,30,0.92); color:#d5f5d5; height:100%;
+    font-family:'SF Mono', Menlo, Consolas, monospace; font-size:13px;
+    padding:10px 12px; overflow:auto; line-height:1.5;
+  }
+  .terminal .prompt{ color:#7fd3ff; }
+  .terminal .path{ color:#ffd479; }
+
+  /* ---------- About window ---------- */
+  .about-content{ padding:26px; text-align:center; }
+  .about-content .glyph{ font-size:56px; margin-bottom:6px; }
+  .about-content h2{ font-size:18px; margin-bottom:2px; }
+  .about-content p{ font-size:12.5px; color:#555; margin-top:4px; }
+  .about-content table{ margin:16px auto 0; font-size:12px; text-align:left; border-collapse:collapse; }
+  .about-content td{ padding:2px 10px; color:#333; }
+  .about-content td:first-child{ color:#777; text-align:right; }
+
+  /* ---------- Dock ---------- */
+  #dock-wrap{
+    position:fixed; bottom:0; left:0; right:0; height:96px;
+    display:flex; align-items:flex-end; justify-content:center;
+    z-index:9500; pointer-events:none;
+  }
+  #dock{
+    pointer-events:auto;
+    display:flex; align-items:flex-end; gap:8px;
+    background:rgba(255,255,255,0.28);
+    backdrop-filter:blur(24px) saturate(180%);
+    -webkit-backdrop-filter:blur(24px) saturate(180%);
+    border-radius:20px;
+    padding:8px 10px 6px;
+    margin-bottom:8px;
+    box-shadow:0 8px 30px rgba(0,0,0,0.3), 0 0 0 0.5px rgba(255,255,255,0.5) inset;
+  }
+  .dock-item{
+    position:relative;
+    width:52px; height:52px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:32px;
+    border-radius:12px;
+    cursor:pointer;
+    transition:transform .12s ease, width .12s ease, height .12s ease;
+    transform-origin:bottom center;
+  }
+  .dock-item:hover{ transform:translateY(-14px) scale(1.35); }
+  .dock-item .dot{
+    position:absolute; bottom:-7px; left:50%; transform:translateX(-50%);
+    width:4px; height:4px; border-radius:50%; background:#444; opacity:0;
+  }
+  .dock-item.running .dot{ opacity:1; }
+  .dock-sep{
+    width:1px; align-self:stretch; margin:4px 4px;
+    background:rgba(255,255,255,0.35);
+  }
+  .tooltip{
+    position:absolute; bottom:66px; left:50%; transform:translateX(-50%);
+    background:rgba(50,50,52,0.85); color:white; font-size:12px;
+    padding:3px 9px; border-radius:5px; white-space:nowrap;
+    opacity:0; pointer-events:none; transition:opacity .1s ease;
+  }
+  .dock-item:hover .tooltip{ opacity:1; }
+
+  ::-webkit-scrollbar{ width:9px; height:9px; }
+  ::-webkit-scrollbar-thumb{ background:rgba(0,0,0,0.25); border-radius:5px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  /* ---------- Splash / Boot screen ---------- */
+  #splash{
+    position:fixed; inset:0; z-index:20000;
+    background:#000;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:22px;
+    transition:opacity .6s ease;
+  }
+  #splash.hide{ opacity:0; pointer-events:none; }
+  .splash-glyph{ font-size:72px; }
+  .splash-spinner{
+    width:28px; height:28px; border-radius:50%;
+    border:3px solid rgba(255,255,255,0.25);
+    border-top-color:rgba(255,255,255,0.9);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .splash-credit{
+    color:rgba(255,255,255,0.85); font-size:14px; letter-spacing:.02em;
+    position:absolute; bottom:60px;
+  }
+</style>
+</head>
+<body>
+
+  <!-- Boot / Splash Screen -->
+  <div id="splash">
+    <div class="splash-glyph">🐧</div>
+    <div class="splash-spinner"></div>
+    <div class="splash-credit">Designed by <b>Ashwani Chandra</b></div>
+  </div>
+
+  <!-- Menu Bar -->
+  <div id="menubar">
+    <div class="left">
+      <span class="apple-logo" title="Designed by Ashwani Chandra">🐧</span>
+      <span class="app-name" id="active-app-name">Finder</span>
+      <span>File</span><span>Edit</span><span>View</span><span>Go</span><span>Window</span><span>Help</span>
+    </div>
+    <div class="right">
+      <span class="icon">🔋</span>
+      <span class="icon">📶</span>
+      <span class="icon">🔊</span>
+      <span id="clock"></span>
+    </div>
+  </div>
+
+  <!-- Desktop icons -->
+  <div id="desktop-icons">
+    <div class="dicon"><div class="glyph">🗂️</div><div class="label">Projects</div></div>
+    <div class="dicon"><div class="glyph">📄</div><div class="label">Notes.txt</div></div>
+    <div class="dicon"><div class="glyph">💽</div><div class="label">Linux HD</div></div>
+  </div>
+
+  <!-- Dock -->
+  <div id="dock-wrap">
+    <div id="dock">
+      <div class="dock-item" data-win="finder"><span>📁</span><span class="tooltip">Finder</span><span class="dot"></span></div>
+      <div class="dock-item" data-win="terminal"><span>⬛</span><span class="tooltip">Terminal</span><span class="dot"></span></div>
+      <div class="dock-item" data-win="notes"><span>📝</span><span class="tooltip">Notes</span><span class="dot"></span></div>
+      <div class="dock-item" data-win="settings"><span>⚙️</span><span class="tooltip">System Settings</span><span class="dot"></span></div>
+      <div class="dock-sep"></div>
+      <div class="dock-item" data-win="about"><span>🐧</span><span class="tooltip">About This Desktop</span><span class="dot"></span></div>
+    </div>
+  </div>
+
+  <!-- Windows layer -->
+  <div id="windows-layer"></div>
+
+<script>
+// ---------------- Clock ----------------
+function updateClock(){
+  const now = new Date();
+  const opts = { weekday:'short', month:'short', day:'numeric' };
+  const dateStr = now.toLocaleDateString('en-US', opts);
+  let h = now.getHours();
+  const m = now.getMinutes().toString().padStart(2,'0');
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12; if(h===0) h = 12;
+  document.getElementById('clock').textContent = `${dateStr}  ${h}:${m} ${ampm}`;
+}
+updateClock();
+setInterval(updateClock, 1000*10);
+
+// ---------------- Window management ----------------
+const layer = document.getElementById('windows-layer');
+let zTop = 100;
+const openWindows = {}; // id -> element
+
+const windowDefs = {
+  finder: {
+    title: 'Finder', width:640, height:420, x:120, y:70,
+    body: `
+      <div class="finder-layout">
+        <div class="sidebar">
+          <div class="heading">Favorites</div>
+          <div class="item active">🖥️&nbsp; Desktop</div>
+          <div class="item">🏠&nbsp; Home</div>
+          <div class="item">⬇️&nbsp; Downloads</div>
+          <div class="item">📄&nbsp; Documents</div>
+          <div class="heading">Locations</div>
+          <div class="item">💽&nbsp; Linux HD</div>
+          <div class="item">☁️&nbsp; Drive</div>
+        </div>
+        <div class="finder-main">
+          <div class="grid-icons">
+            <div class="fi"><div class="g">📁</div><div class="l">Presales Decks</div></div>
+            <div class="fi"><div class="g">📁</div><div class="l">Bid Templates</div></div>
+            <div class="fi"><div class="g">📊</div><div class="l">Pricing.xlsx</div></div>
+            <div class="fi"><div class="g">📄</div><div class="l">Proposal.docx</div></div>
+            <div class="fi"><div class="g">🖼️</div><div class="l">Architecture.svg</div></div>
+            <div class="fi"><div class="g">📁</div><div class="l">Playbooks</div></div>
+          </div>
+        </div>
+      </div>`
+  },
+  terminal: {
+    title: 'Terminal — bash — 80×24', width:560, height:340, x:220, y:130,
+    body: `
+      <div class="terminal">
+<span class="prompt">ashwani@linux-desktop</span>:<span class="path">~</span>$ neofetch
+        OS: Ubuntu 24.04 LTS (macOS-styled shell)
+        WM: Custom Web Compositor
+        Theme: Sequoia-Glass
+        Shell: bash 5.2
+<span class="prompt">ashwani@linux-desktop</span>:<span class="path">~</span>$ echo "UI ready, no mistakes ✅"
+        UI ready, no mistakes ✅
+<span class="prompt">ashwani@linux-desktop</span>:<span class="path">~</span>$ █
+      </div>`
+  },
+  notes: {
+    title: 'Notes', width:420, height:360, x:340, y:90,
+    body: `<div style="padding:16px; background:#fffceb; height:100%; font-size:14px; line-height:1.6;">
+      <b>Today</b><br>
+      • Finish SJC Oman UDP pricing schedule<br>
+      • Review Otech IMS Gantt timeline<br>
+      • Draft pull marketing playbook outline
+    </div>`
+  },
+  settings: {
+    title: 'System Settings', width:480, height:360, x:260, y:150,
+    body: `<div style="padding:20px;">
+      <h3 style="margin-bottom:12px;">Appearance</h3>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><input type="radio" name="appearance" checked> Light</label>
+      <label style="display:flex;align-items:center;gap:8px;margin-bottom:16px;"><input type="radio" name="appearance"> Dark</label>
+      <h3 style="margin-bottom:12px;">Dock</h3>
+      <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" checked> Magnification</label>
+    </div>`
+  },
+  about: {
+    title: 'About This Desktop', width:360, height:360, x:420, y:180,
+    body: `<div class="about-content">
+      <div class="glyph">🐧</div>
+      <h2>Linux Desktop</h2>
+      <p>macOS-inspired shell, built in HTML/CSS/JS</p>
+      <table>
+        <tr><td>Kernel</td><td>6.9.0-generic</td></tr>
+        <tr><td>Shell theme</td><td>Sequoia Glass</td></tr>
+        <tr><td>Memory</td><td>16 GB</td></tr>
+        <tr><td>Display</td><td>2560×1440</td></tr>
+        <tr><td>Designed by</td><td><b>Ashwani Chandra</b></td></tr>
+      </table>
+    </div>`
+  }
+};
+
+function bringToFront(win){
+  zTop += 1;
+  win.style.zIndex = zTop;
+  document.querySelectorAll('.window').forEach(w => w.classList.add('inactive'));
+  win.classList.remove('inactive');
+  const def = windowDefs[win.dataset.id];
+  document.getElementById('active-app-name').textContent = def ? def.title.split(' —')[0] : 'Finder';
+}
+
+function setDockRunning(id, running){
+  const dot = document.querySelector(`.dock-item[data-win="${id}"] .dot`);
+  const item = document.querySelector(`.dock-item[data-win="${id}"]`);
+  if(dot) item.classList.toggle('running', running);
+}
+
+function openWindow(id){
+  if(openWindows[id]){
+    openWindows[id].style.display = 'flex';
+    bringToFront(openWindows[id]);
+    return;
+  }
+  const def = windowDefs[id];
+  if(!def) return;
+
+  const win = document.createElement('div');
+  win.className = 'window';
+  win.dataset.id = id;
+  win.style.left = def.x + 'px';
+  win.style.top = def.y + 'px';
+  win.style.width = def.width + 'px';
+  win.style.height = def.height + 'px';
+
+  win.innerHTML = `
+    <div class="titlebar">
+      <div class="traffic">
+        <span class="close" title="Close"></span>
+        <span class="min" title="Minimize"></span>
+        <span class="zoom" title="Zoom"></span>
+      </div>
+      <div class="wtitle">${def.title}</div>
+    </div>
+    <div class="wbody">${def.body}</div>
+    <div class="resize-handle"></div>
+  `;
+  layer.appendChild(win);
+  openWindows[id] = win;
+  setDockRunning(id, true);
+  bringToFront(win);
+
+  // Dragging
+  const titlebar = win.querySelector('.titlebar');
+  let dragging = false, offX = 0, offY = 0;
+  titlebar.addEventListener('mousedown', e => {
+    if(e.target.closest('.traffic')) return;
+    dragging = true;
+    offX = e.clientX - win.offsetLeft;
+    offY = e.clientY - win.offsetTop;
+    bringToFront(win);
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if(!dragging) return;
+    let nx = e.clientX - offX;
+    let ny = Math.max(26, e.clientY - offY);
+    win.style.left = nx + 'px';
+    win.style.top = ny + 'px';
+  });
+  window.addEventListener('mouseup', () => dragging = false);
+
+  // Resizing
+  const handle = win.querySelector('.resize-handle');
+  let resizing = false, startW=0, startH=0, startX=0, startY=0;
+  handle.addEventListener('mousedown', e => {
+    resizing = true;
+    startW = win.offsetWidth; startH = win.offsetHeight;
+    startX = e.clientX; startY = e.clientY;
+    e.stopPropagation(); e.preventDefault();
+  });
+  window.addEventListener('mousemove', e => {
+    if(!resizing) return;
+    win.style.width = Math.max(300, startW + (e.clientX - startX)) + 'px';
+    win.style.height = Math.max(180, startH + (e.clientY - startY)) + 'px';
+  });
+  window.addEventListener('mouseup', () => resizing = false);
+
+  // Focus on click anywhere
+  win.addEventListener('mousedown', () => bringToFront(win));
+
+  // Traffic lights
+  win.querySelector('.close').addEventListener('click', () => {
+    win.style.display = 'none';
+    setDockRunning(id, false);
+  });
+  win.querySelector('.min').addEventListener('click', () => {
+    win.style.display = 'none';
+  });
+  win.querySelector('.zoom').addEventListener('click', () => {
+    if(win.dataset.zoomed === '1'){
+      win.style.width = def.width + 'px';
+      win.style.height = def.height + 'px';
+      win.style.left = def.x + 'px';
+      win.style.top = def.y + 'px';
+      win.dataset.zoomed = '0';
+    } else {
+      win.dataset.prevRect = JSON.stringify({w:win.style.width,h:win.style.height,l:win.style.left,t:win.style.top});
+      win.style.width = '92vw';
+      win.style.height = '86vh';
+      win.style.left = '4vw';
+      win.style.top = 'calc(var(--menubar-h) + 10px)';
+      win.dataset.zoomed = '1';
+    }
+  });
+}
+
+document.querySelectorAll('.dock-item').forEach(item => {
+  item.addEventListener('click', () => openWindow(item.dataset.win));
+});
+
+// Desktop icon selection
+document.querySelectorAll('.dicon').forEach(icon => {
+  icon.addEventListener('click', (e) => {
+    document.querySelectorAll('.dicon').forEach(i => i.classList.remove('selected'));
+    icon.classList.add('selected');
+    e.stopPropagation();
+  });
+});
+document.body.addEventListener('click', () => {
+  document.querySelectorAll('.dicon').forEach(i => i.classList.remove('selected'));
+});
+
+// Open Finder by default
+openWindow('finder');
+
+// Boot splash sequence
+window.addEventListener('load', () => {
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hide');
+  }, 1400);
+});
+</script>
+</body>
+</html>
