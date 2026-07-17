@@ -1,2 +1,4 @@
 # aclimac
-A pixel-perfect, single-file recreation of a macOS-style Linux desktop UI with draggable windows, a magnifying dock, Finder, Terminal, and more. Pure HTML/CSS/JS, zero dependencies, zero build step.
+Aclimac is a fully interactive macOS-inspired Linux desktop environment UI, built entirely as a single self-contained HTML file no frameworks, no bundler, no dependencies. Open it in a browser and get a working desktop shell: a translucent menu bar with a live clock, a magnifying dock, and draggable, resizable windows with working close/minimize/zoom controls.
+It ships with five functional "apps": a Finder window with sidebar navigation and a file grid, a Terminal with a neofetch-style **boot banner, a Notes app, a System Settings panel, and an About This Desktop screen** plus an animated boot splash on load. Everything is rendered with vanilla JavaScript and CSS (backdrop-filter glassmorphism, macOS-accurate style traffic-light buttons, spring-timed dock hover effects) in ~500 lines.
+**Tech:** HTML5, CSS3 (glassmorphism / backdrop-filter), vanilla JavaScript — no frameworks, no build step. Just open 
